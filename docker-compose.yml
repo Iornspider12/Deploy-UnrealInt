@@ -1,0 +1,64 @@
+name: 3tier-orch # This sets the project name
+services:
+  turn:
+    image: coturn/coturn:latest
+    container_name: coturn
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49160-49200:49160-49200/udp"
+    networks:
+      webrtc-network:
+        ipv4_address: 172.18.0.3
+    # REMOVED network_mode: "host" - it conflicts with static IPs and bridge networks
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+
+  aiortc:
+    build: .
+    image: aiortc:latest
+    container_name: aiortc
+    ports:
+      - "8000:8000"
+      - "8001:8001"
+      - "8002:8002"
+      - "8003:8003"
+    networks:
+      webrtc-network:
+        ipv4_address: 172.18.0.4 # Giving this a static IP too helps stability
+    depends_on:
+      - turn
+      - ollama
+    environment:
+      - EXT_IP=${EXT_IP} # This bridges the host variable to the container
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=gemma3:1b
+      - VOICE_IP=${VOICE_IP} # This bridges the host variable to the container
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+      - ./llm.sh:/llm.sh
+    # Set execution permissions and run the script
+    entrypoint: ["/bin/sh", "-c", "chmod +x /llm.sh && /llm.sh"]
+    networks:
+      webrtc-network:
+        ipv4_address: 172.18.0.5
+    environment:
+      - OLLAMA_MODEL=gemma3:1b
+
+networks:
+  webrtc-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+          gateway: 172.18.0.1
+
+volumes:
+  ollama-data:
