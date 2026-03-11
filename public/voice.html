@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>WebRTC Audio Loopback</title>
+</head>
+
+<body>
+    <h1>WebRTC Audio Loopback</h1>
+    <button onclick="start()">Start</button>
+
+    <script>
+        let pc = null;
+
+        async function start() {
+            pc = new RTCPeerConnection({
+                "iceServers": [
+                    { "urls": ["stun:stun.l.google.com:19302"] },
+                    {
+                        "urls": ["turn:<EXT_IP>:3478"],
+                        "username": "webrtc",
+                        "credential": "webrtcpass"
+                    }
+                ]
+            });
+
+            // either use microphone or recorded audio only one at a time (implemented to showcase with & without echo)
+
+            // use Microphone Audio
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+            // // use recorded audio (streams from file)
+            // const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // const resp = await fetch('/audio/myvoice_stt.wav'); // Replace with actual path
+            // const arrayBuffer = await resp.arrayBuffer();
+            // const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            // // Create a MediaStreamDestination
+            // const destination = audioContext.createMediaStreamDestination();
+
+            // // Connect audio buffer source to the destination
+            // const source = audioContext.createBufferSource();
+            // source.buffer = audioBuffer;
+            // source.loop = true;
+            // source.connect(destination);
+            // source.start(0);
+
+            // // Now add the stream to the PeerConnection
+            // destination.stream.getTracks().forEach((track) => pc.addTrack(track, destination.stream));
+
+            pc.ontrack = function (event) {
+                const [remoteStream] = event.streams;
+                const audio = document.createElement("audio");
+                audio.autoplay = true;
+                audio.srcObject = remoteStream;
+                document.body.appendChild(audio);
+            };
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            const response = await fetch("http://localhost:8000/offer", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sdp: pc.localDescription.sdp,
+                    type: pc.localDescription.type,
+                })
+            });
+
+            const answer = await response.json();
+            console.log(answer)
+            await pc.setRemoteDescription(answer);
+        }
+    </script>
+</body>
+
+</html>

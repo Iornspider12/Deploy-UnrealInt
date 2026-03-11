@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>WebRTC Unified Chat + Voice</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        h1 {
+            color: #1a1a2e;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .container {
+            background-color: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        #chat {
+            width: 100%;
+            height: 350px;
+            margin: 15px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow-y: auto;
+            background-color: #fafafa;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 14px;
+        }
+        #input-container {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        #textInput {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        #textInput:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        #textInput:disabled {
+            background-color: #f5f5f5;
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        button:hover:not(:disabled) {
+            background-color: #43a047;
+            transform: translateY(-1px);
+        }
+        button:disabled {
+            background-color: #bdbdbd;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #stopBtn {
+            background-color: #f44336;
+        }
+        #stopBtn:hover:not(:disabled) {
+            background-color: #e53935;
+        }
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 15px 0;
+            padding: 12px 15px;
+            border-radius: 8px;
+            background-color: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        .status-bar.error {
+            background-color: #ffebee;
+            border-left-color: #f44336;
+        }
+        .status-bar.success {
+            background-color: #e8f5e9;
+            border-left-color: #4CAF50;
+        }
+        .status-bar.processing {
+            background-color: #fff3e0;
+            border-left-color: #ff9800;
+        }
+        .status-icon {
+            font-size: 20px;
+        }
+        .status-text {
+            flex: 1;
+            font-weight: 500;
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .mode-badges {
+            display: flex;
+            gap: 8px;
+            margin-left: auto;
+        }
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .badge-voice {
+            background-color: #fff3e0;
+            color: #e65100;
+            border: 1px solid #ffcc80;
+        }
+        .badge-voice.active {
+            background-color: #ff9800;
+            color: white;
+            border-color: #ff9800;
+        }
+        .badge-text {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #90caf9;
+        }
+        .badge-text.active {
+            background-color: #2196f3;
+            color: white;
+            border-color: #2196f3;
+        }
+        .badge-processing {
+            background-color: #f3e5f5;
+            color: #7b1fa2;
+            border: 1px solid #ce93d8;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .message {
+            margin: 8px 0;
+            padding: 10px 15px;
+            border-radius: 8px;
+            max-width: 85%;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            color: #1565c0;
+            margin-left: auto;
+            text-align: right;
+        }
+        .assistant-message {
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .message-label {
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            opacity: 0.7;
+        }
+        .message-content {
+            line-height: 1.5;
+        }
+        .voice-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+        .connection-quality {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: #666;
+        }
+        .quality-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+        }
+        .quality-dot.warning {
+            background-color: #ff9800;
+        }
+        .quality-dot.error {
+            background-color: #f44336;
+        }
+        .retry-btn {
+            background-color: #ff9800;
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+        .retry-btn:hover:not(:disabled) {
+            background-color: #f57c00;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>WebRTC Unified Chat + Voice</h1>
+        <p class="subtitle">Speak or type - your choice, seamlessly integrated</p>
+        
+        <div id="statusBar" class="status-bar">
+            <span id="statusIcon" class="status-icon">&#128992;</span>
+            <span id="statusText" class="status-text">Click "Start" to begin</span>
+            <div id="connectionQuality" class="connection-quality hidden">
+                <span class="quality-dot"></span>
+                <span id="qualityText">Connected</span>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn" onclick="start()">Start</button>
+            <button id="stopBtn" onclick="stop()" disabled>Stop</button>
+            <button id="retryBtn" class="retry-btn hidden" onclick="retry()">Retry Connection</button>
+            <div class="mode-badges">
+                <div id="voiceBadge" class="badge badge-voice">
+                    <span>&#127908;</span> Voice
+                </div>
+                <div id="textBadge" class="badge badge-text">
+                    <span>&#128172;</span> Text
+                </div>
+                <div id="processingBadge" class="badge badge-processing hidden">
+                    <span>&#9881;</span> Processing...
+                </div>
+            </div>
+        </div>
+        
+        <div id="chat"></div>
+        
+        <div id="input-container">
+            <input type="text" id="textInput" placeholder="Type your message here..." disabled />
+            <button id="sendBtn" onclick="sendTextMessage()" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // State Management
+        // ============================================================
+        let pc = null;
+        let dataChannel = null;
+        let isConnected = false;
+        let hasAudioTrack = false;
+        let hasDataChannel = false;
+        let localStream = null;
+        let isProcessing = false;
+        let retryCount = 0;
+        let currentSlot = null;  // Store the slot ID for cleanup
+        const MAX_RETRIES = 3;
+
+        // ============================================================
+        // UI Update Functions
+        // ============================================================
+        function updateStatus(message, type = 'info') {
+            const statusBar = document.getElementById("statusBar");
+            const statusIcon = document.getElementById("statusIcon");
+            const statusText = document.getElementById("statusText");
+            
+            statusBar.className = "status-bar";
+            
+            switch(type) {
+                case 'error':
+                    statusBar.classList.add('error');
+                    statusIcon.innerHTML = '&#10060;'; // Red X
+                    break;
+                case 'success':
+                    statusBar.classList.add('success');
+                    statusIcon.innerHTML = '&#9989;'; // Green check
+                    break;
+                case 'processing':
+                    statusBar.classList.add('processing');
+                    statusIcon.innerHTML = '&#9881;'; // Gear
+                    break;
+                default:
+                    statusIcon.innerHTML = '&#128992;'; // Blue circle
+            }
+            
+            statusText.textContent = message;
+        }
+
+        function updateModeBadges() {
+            const voiceBadge = document.getElementById("voiceBadge");
+            const textBadge = document.getElementById("textBadge");
+            const processingBadge = document.getElementById("processingBadge");
+            
+            voiceBadge.className = hasAudioTrack ? "badge badge-voice active" : "badge badge-voice";
+            textBadge.className = hasDataChannel ? "badge badge-text active" : "badge badge-text";
+            processingBadge.className = isProcessing ? "badge badge-processing" : "badge badge-processing hidden";
+        }
+
+        function updateConnectionQuality(state) {
+            const qualityDiv = document.getElementById("connectionQuality");
+            const qualityDot = qualityDiv.querySelector(".quality-dot");
+            const qualityText = document.getElementById("qualityText");
+            
+            qualityDiv.classList.remove("hidden");
+            qualityDot.className = "quality-dot";
+            
+            switch(state) {
+                case 'connected':
+                case 'completed':
+                    qualityText.textContent = "Connected";
+                    break;
+                case 'checking':
+                    qualityDot.classList.add("warning");
+                    qualityText.textContent = "Connecting...";
+                    break;
+                case 'disconnected':
+                case 'failed':
+                    qualityDot.classList.add("error");
+                    qualityText.textContent = "Disconnected";
+                    break;
+                default:
+                    qualityDiv.classList.add("hidden");
+            }
+        }
+
+        function showRetryButton(show) {
+            document.getElementById("retryBtn").classList.toggle("hidden", !show);
+        }
+
+        function setProcessing(processing) {
+            isProcessing = processing;
+            updateModeBadges();
+        }
+
+        function addMessage(text, isUser = false, isVoice = false) {
+            const chatDiv = document.getElementById("chat");
+            const messageDiv = document.createElement("div");
+            messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'}`;
+            
+            const label = document.createElement("div");
+            label.className = "message-label";
+            label.textContent = isUser ? "You" : "Assistant";
+            
+            const content = document.createElement("div");
+            content.className = "message-content";
+            content.textContent = text;
+            
+            messageDiv.appendChild(label);
+            messageDiv.appendChild(content);
+            
+            if (isVoice) {
+                const voiceIndicator = document.createElement("div");
+                voiceIndicator.className = "voice-indicator";
+                voiceIndicator.innerHTML = "&#127908; Voice";
+                messageDiv.appendChild(voiceIndicator);
+            }
+            
+            chatDiv.appendChild(messageDiv);
+            chatDiv.scrollTop = chatDiv.scrollHeight;
+        }
+
+        function enableInputs(enabled) {
+            document.getElementById("textInput").disabled = !enabled;
+            document.getElementById("sendBtn").disabled = !enabled;
+            document.getElementById("stopBtn").disabled = !enabled;
+        }
+
+        // ============================================================
+        // Connection Functions
+        // ============================================================
+        async function start() {
+            try {
+                retryCount = 0;
+                showRetryButton(false);
+                updateStatus("Initializing connection...", "processing");
+                document.getElementById("startBtn").disabled = true;
+
+                pc = new RTCPeerConnection({
+                    "iceServers": [
+                        { "urls": ["stun:stun.l.google.com:19302"] },
+                        {
+                            "urls": ["turn:192.168.208.1:3478"],
+                            "username": "webrtc",
+                            "credential": "webrtcpass"
+                        }
+                    ]
+                });
+
+                // Create data channel for text messages
+                dataChannel = pc.createDataChannel("chat");
+                setupDataChannelHandlers();
+
+                // Try to get microphone audio
+                try {
+                    localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    localStream.getTracks().forEach(track => {
+                        pc.addTrack(track, localStream);
+                        hasAudioTrack = true;
+                    });
+                    updateModeBadges();
+                    updateStatus("Microphone access granted", "success");
+                } catch (audioError) {
+                    console.warn("Microphone access denied or unavailable:", audioError);
+                    updateStatus("Microphone not available - Text mode only", "info");
+                    hasAudioTrack = false;
+                    updateModeBadges();
+                }
+
+                // Handle incoming audio (TTS responses)
+                pc.ontrack = function(event) {
+                    const [remoteStream] = event.streams;
+                    let audio = document.querySelector("#responseAudio");
+                    if (!audio) {
+                        audio = document.createElement("audio");
+                        audio.id = "responseAudio";
+                        audio.autoplay = true;
+                        audio.style.display = "none";
+                        document.body.appendChild(audio);
+                    }
+                    audio.srcObject = remoteStream;
+                    console.log("Audio track received from server");
+                };
+
+                pc.oniceconnectionstatechange = function() {
+                    console.log("ICE connection state:", pc.iceConnectionState);
+                    updateConnectionQuality(pc.iceConnectionState);
+                    
+                    if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+                        isConnected = true;
+                        updateStatus("Connected! You can now speak or type messages.", "success");
+                        if (hasDataChannel && dataChannel.readyState === "open") {
+                            enableInputs(true);
+                        }
+                    } else if (pc.iceConnectionState === "disconnected") {
+                        updateStatus("Connection interrupted. Attempting to reconnect...", "processing");
+                    } else if (pc.iceConnectionState === "failed") {
+                        updateStatus("Connection failed. Click 'Retry' to try again.", "error");
+                        isConnected = false;
+                        enableInputs(false);
+                        showRetryButton(true);
+                    }
+                };
+
+                // Create and send offer
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                updateStatus("Sending connection request...", "processing");
+
+                // Use current origin to work from any host (localhost or external IP)
+                const offerUrl = window.location.origin + "/offer";
+                console.log("Sending WebRTC offer to:", offerUrl);
+                
+                const response = await fetch(offerUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        sdp: pc.localDescription.sdp,
+                        type: pc.localDescription.type,
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
+                const answerData = await response.json();
+                console.log("Answer received:", answerData);
+                
+                // Check if we got a valid answer
+                if (!answerData.sdp || !answerData.type) {
+                    const errorMsg = answerData.msg || "Failed to get WebRTC answer. The backend may be busy.";
+                    console.error("Invalid answer:", errorMsg);
+                    throw new Error(errorMsg);
+                }
+                
+                // Store the slot ID for cleanup when stopping
+                if (answerData.slot) {
+                    currentSlot = answerData.slot;
+                    console.log("Slot assigned:", currentSlot);
+                }
+                
+                const answer = new RTCSessionDescription({
+                    sdp: answerData.sdp,
+                    type: answerData.type
+                });
+                
+                console.log("Setting remote description...");
+                await pc.setRemoteDescription(answer);
+                console.log("Remote description set successfully");
+                updateStatus("Connection established! Waiting for channels...", "success");
+                document.getElementById("stopBtn").disabled = false;
+
+            } catch (error) {
+                console.error("Error starting connection:", error);
+                handleConnectionError(error);
+            }
+        }
+
+        function setupDataChannelHandlers() {
+            dataChannel.onopen = function() {
+                console.log("DataChannel opened");
+                hasDataChannel = true;
+                updateModeBadges();
+                if (isConnected) {
+                    updateStatus("Connected! You can now speak or type messages.", "success");
+                    enableInputs(true);
+                }
+            };
+
+            dataChannel.onmessage = function(event) {
+                console.log("Received message:", event.data);
+                setProcessing(false);
+                addMessage(event.data, false);
+            };
+
+            dataChannel.onerror = function(error) {
+                console.error("DataChannel error:", error);
+                updateStatus("Communication channel error", "error");
+            };
+
+            dataChannel.onclose = function() {
+                console.log("DataChannel closed");
+                hasDataChannel = false;
+                updateModeBadges();
+                if (!hasAudioTrack) {
+                    updateStatus("Connection closed");
+                    isConnected = false;
+                    enableInputs(false);
+                }
+            };
+        }
+
+        function handleConnectionError(error) {
+            updateStatus(`Error: ${error.message}`, "error");
+            document.getElementById("startBtn").disabled = false;
+            showRetryButton(true);
+            
+            // Clean up on error
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            hasAudioTrack = false;
+            hasDataChannel = false;
+            currentSlot = null;  // Clear the slot ID
+            updateModeBadges();
+        }
+
+        async function retry() {
+            if (retryCount >= MAX_RETRIES) {
+                updateStatus("Max retries reached. Please check your connection and try again.", "error");
+                showRetryButton(false);
+                document.getElementById("startBtn").disabled = false;
+                return;
+            }
+            
+            retryCount++;
+            updateStatus(`Retrying connection (${retryCount}/${MAX_RETRIES})...`, "processing");
+            
+            // Clean up first
+            await stop(true); // silent stop
+            
+            // Wait a bit before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Try again
+            await start();
+        }
+
+        function sendTextMessage() {
+            const input = document.getElementById("textInput");
+            const message = input.value.trim();
+            
+            if (!message || !isConnected || !dataChannel || dataChannel.readyState !== "open") {
+                return;
+            }
+
+            addMessage(message, true);
+            dataChannel.send(message);
+            input.value = "";
+            setProcessing(true);
+            console.log("Sent text message:", message);
+        }
+
+        async function stop(silent = false) {
+            // First, call the backend to free the slot
+            if (currentSlot && !silent) {
+                try {
+                    updateStatus("Stopping session...", "processing");
+                    const stopUrl = window.location.origin + "/stop";
+                    console.log("Sending stop request for slot:", currentSlot);
+                    
+                    const response = await fetch(stopUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ slot: currentSlot })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        console.log("Stop response:", result);
+                    } else {
+                        console.warn("Stop request failed:", response.status);
+                    }
+                } catch (error) {
+                    console.error("Error stopping slot:", error);
+                    // Continue with local cleanup even if backend call fails
+                }
+            }
+            
+            // Clean up local WebRTC resources
+            if (dataChannel) {
+                dataChannel.close();
+                dataChannel = null;
+            }
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+            }
+            if (pc) {
+                pc.close();
+                pc = null;
+            }
+            
+            isConnected = false;
+            hasAudioTrack = false;
+            hasDataChannel = false;
+            isProcessing = false;
+            currentSlot = null;  // Clear the slot ID
+            
+            updateModeBadges();
+            document.getElementById("startBtn").disabled = false;
+            document.getElementById("stopBtn").disabled = true;
+            enableInputs(false);
+            showRetryButton(false);
+            
+            if (!silent) {
+                updateStatus("Connection stopped", "info");
+                document.getElementById("connectionQuality").classList.add("hidden");
+            }
+        }
+
+        // Allow sending message with Enter key
+        document.getElementById("textInput").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                sendTextMessage();
+            }
+        });
+    </script>
+</body>
+
+</html>

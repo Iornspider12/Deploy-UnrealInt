@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>WebRTC + LLM Chat</title>
+</head>
+
+<body>
+  <h1>Chat with LLM via WebRTC</h1>
+  <textarea id="chat" cols="80" rows="20" readonly></textarea><br>
+  <input id="input" placeholder="Say something..." />
+  <button onclick="sendMessage()">Send</button>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("input");
+
+    const pc = new RTCPeerConnection({
+      "iceServers": [
+        { "urls": ["stun:stun.l.google.com:19302"] },
+        {
+          "urls": ["turn:<EXT_IP>:3478"],
+          "username": "webrtc",
+          "credential": "webrtcpass"
+        }
+      ]
+    });
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE state:", pc.iceConnectionState);
+    };
+
+    const dc = pc.createDataChannel("chat");
+
+    dc.onmessage = (event) => {
+      chat.value += "LLM: " + event.data + "\n";
+    };
+
+    dc.onopen = () => {
+      console.log("DataChannel open");
+    };
+
+    async function negotiate() {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      const response = await fetch("http://localhost:8000/offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sdp: pc.localDescription.sdp,
+          type: pc.localDescription.type,
+        }),
+      });
+
+      const answer = await response.json();
+      console.log(answer)
+      await pc.setRemoteDescription(answer);
+    }
+
+    function sendMessage() {
+      const text = input.value;
+      chat.value += "You: " + text + "\n";
+      dc.send(text);
+      input.value = "";
+    }
+
+    negotiate();
+  </script>
+</body>
+
+</html>

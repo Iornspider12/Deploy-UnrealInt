@@ -78,6 +78,7 @@ pytest==8.4.2
 python-dateutil==2.9.0.post0
 python-multipart==0.0.21
 pytz==2025.2
+python-dotenv==1.0.1
 PyYAML==6.0.3
 redis==7.1.0
 requests==2.32.5
