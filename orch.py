@@ -324,9 +324,16 @@ def create_app(slots):
 
 if __name__ == "__main__":
     import uvicorn
+    import argparse
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--slots", type=int, default=2)
+    args = parser.parse_args()
+    
     manager = Manager()
     slots = manager.dict({
-        f"localhost:8000-{x}": manager.dict(ProcessInfo(id=x, sts="Offline").model_dump()) for x in range(2)
+        f"localhost:{args.port}-{x}": manager.dict(ProcessInfo(id=x, sts="Offline").model_dump()) for x in range(args.slots)
     })
     app = create_app(slots)
-    uvicorn.run(app, host="localhost", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=args.port)
