@@ -13,7 +13,9 @@ services:
     # REMOVED network_mode: "host" - it conflicts with static IPs and bridge networks
     volumes:
       - ./turnserver.conf:/etc/coturn/turnserver.conf
-    command: ["-c", "/etc/coturn/turnserver.conf"]
+    environment:
+      - EXT_IP=${EXT_IP}
+    command: ["-c", "/etc/coturn/turnserver.conf", "--external-ip=${EXT_IP}/172.18.0.3"]
 
   aiortc:
     build: .
@@ -31,10 +33,13 @@ services:
       - turn
       - ollama
     environment:
-      - EXT_IP=${EXT_IP} # This bridges the host variable to the container
+      - EXT_IP=${EXT_IP}
       - OLLAMA_URL=http://ollama:11434
       - OLLAMA_MODEL=gemma3:1b
-      - VOICE_IP=${VOICE_IP} # This bridges the host variable to the container
+      - VOICE_IP=${VOICE_IP}
+      - API_KEY=${API_KEY}
+      - TURN_USER=${TURN_USER}
+      - TURN_PASS=${TURN_PASS}
 
   ollama:
     image: ollama/ollama:latest

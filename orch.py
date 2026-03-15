@@ -20,13 +20,17 @@ from dotenv import load_dotenv
 # Load env variables (Main process)
 load_dotenv()
 
+_EXT_IP = os.getenv("EXT_IP", "127.0.0.1")
+_TURN_USER = os.getenv("TURN_USER", "webrtc")
+_TURN_PASS = os.getenv("TURN_PASS", "webrtcpass")
+
 config = RTCConfiguration(
     iceServers=[
+        RTCIceServer(urls=["stun:stun.l.google.com:19302"]),
         RTCIceServer(
-            urls=[
-                "stun:stun.l.google.com:19302",
-                "turn:0.0.0.0:3478"
-            ]
+            urls=[f"turn:{_EXT_IP}:3478"],
+            username=_TURN_USER,
+            credential=_TURN_PASS
         )
     ]
 )
@@ -296,11 +300,10 @@ def create_app(slots):
     app = FastAPI()
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-    API_KEY = "secret123" # Move to .env for production
+    API_KEY = os.getenv("API_KEY", "changeme")
 
     @app.post("/offer")
     async def offer(request: Request):
-        # SECURITY: API Key protection
         if request.headers.get("x-api-key") != API_KEY:
             raise HTTPException(401, "Invalid API Key")
 

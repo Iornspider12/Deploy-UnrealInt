@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
 from contextlib import asynccontextmanager
 from starlette.middleware.cors import CORSMiddleware
 import httpx
@@ -6,7 +6,12 @@ import asyncio
 import socket
 import uvicorn
 import json
+import os
+from dotenv import load_dotenv
 from fastapi.staticfiles import StaticFiles
+
+load_dotenv()
+API_KEY = os.getenv("API_KEY", "changeme")
 
 
 def external_ip():
@@ -59,12 +64,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-# Allow CORS for dev
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"]
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type", "x-api-key"]
 )
 
 
@@ -82,18 +87,21 @@ async def health_check():
 
 @app.api_route("/offer", methods=["POST"])
 async def forward_request(request: Request):
-    # Find the server with the least connections and available resources
-    # This is a simplified example; a real implementation would consider weights and thresholds
-    least_loaded = sorted(
-        servers, key=lambda d: d['free'], reverse=True)[0]
+    # SECURITY: API key check at load balancer entry point
+    if request.headers.get("x-api-key") != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API Key")
+
+    least_loaded = sorted(servers, key=lambda d: d['free'], reverse=True)[0]
 
     try:
         async with httpx.AsyncClient() as client:
-            target_url = f"{least_loaded['url']}/start"
+            target_url = f"{least_loaded['url']}/offer"
+            # Forward the API key so orch.py's own check also passes
+            forwarded_headers = {**dict(request.headers), "x-api-key": API_KEY}
             response = await client.request(
                 method=request.method,
                 url=target_url,
-                headers=request.headers,
+                headers=forwarded_headers,
                 data=await request.body(),
                 params=request.query_params,
                 timeout=30
